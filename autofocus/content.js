@@ -1,4 +1,3 @@
-console.log('alt+tab to chrome.')
 var keywordElement = document.getElementById('kw')//baidu
 if(!keywordElement) keywordElement = document.getElementById('APjFqb')//google
 if(!keywordElement) keywordElement = document.getElementById('chat-input')//chatgpt
