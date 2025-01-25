@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Auto-focus-while-searching",
+  "version": "1.0",
+  "description": "Auto-focus on searching bar when switch to chrome, switch to baidu/google tabs",
+  "permissions": ["tabs", "scripting", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
