@@ -1,9 +1,16 @@
-var input = document.getElementById('kw')//baidu
-if(!input) input = document.getElementById('APjFqb')//google
-if(!input) input = document.getElementById('chat-input')//chatgpt
-if(!input) input = document.getElementById('prompt-textarea')//deepseek
-if(input){
+var input = null
+var module = null
+if(!input) input = document.getElementById('kw'), module='BAIDU'//baidu
+if(!input) input = document.getElementById('APjFqb'), module='GOOGLE'//google
+if(!input) input = document.getElementById('chat-input'), module='CHATGPT'//chatgpt
+if(!input) input = document.getElementById('prompt-textarea'), module='DEEPSEEK'//deepseek
+// clear
+if(module=='BAIDU' || module=='GOOGLE'){
   input.innerHTML = ''
   input.value=''
+}
+// focus
+if(input){
+  
   input.focus()
 }
