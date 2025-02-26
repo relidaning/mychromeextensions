@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Quick Google Search",
+  "description": "Search selected text in Google with a shortcut.",
+  "version": "1.0",
+  "permissions": [
+    "activeTab", "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "search-selected-text": {
+      "suggested_key": {
+        "default": "Ctrl+I"
+      },
+      "description": "Search selected text"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
