@@ -12,14 +12,9 @@
   "commands": {
     "search-selected-text": {
       "suggested_key": {
-        "default": "Ctrl+Q"
+        "default": "Ctrl+X"
       },
       "description": "Search selected text"
     }
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }
