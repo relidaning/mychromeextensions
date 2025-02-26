@@ -12,7 +12,7 @@
   "commands": {
     "search-selected-text": {
       "suggested_key": {
-        "default": "Ctrl+I"
+        "default": "Ctrl+Q"
       },
       "description": "Search selected text"
     }
