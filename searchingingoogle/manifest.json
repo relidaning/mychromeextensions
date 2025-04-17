@@ -4,7 +4,7 @@
   "description": "Search selected text in Google with a shortcut.",
   "version": "1.0",
   "permissions": [
-    "activeTab", "scripting"
+    "activeTab", "scripting", "clipboardRead"
   ],
   "background": {
     "service_worker": "background.js"
