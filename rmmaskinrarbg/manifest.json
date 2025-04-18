@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Auto remove mask in rarbg",
+  "version": "1.0",
+  "description": "Auto remove mask in rarbg",
+  "permissions": ["tabs", "scripting", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
