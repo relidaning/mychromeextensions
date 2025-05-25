@@ -11,15 +11,15 @@ chrome.commands.onCommand.addListener(function (command) {
 
 function searchSelectedText() {
   let selectedText = window.getSelection().toString();
-  let searchURL = `https://dictionary.cambridge.org/dictionary/english`;
+  let searchURL = `https://www.google.com/search?q=`;
   if (selectedText) {
-    searchURL+=`/${encodeURIComponent(selectedText)}`
+    searchURL+=`${encodeURIComponent(selectedText+'meaning')}`
     window.open(searchURL, "_blank");
   } else {
     // alert("Please select text first!");
     navigator.clipboard.readText()
       .then(text => {
-        searchURL+=`/${encodeURIComponent(text)}`
+        searchURL+=`${encodeURIComponent(text+'meaning')}`
         window.open(searchURL, "_blank");
       })
       .catch(err => {

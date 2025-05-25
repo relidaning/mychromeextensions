@@ -14,6 +14,14 @@ Auto focus on the input when you activate your baidu/google tab, so you don't ne
 
 When you see some words or expressions that you do not understand, you can press 'ctrl+x' to open a new tab and search it on google.
 
+### RmMaskInRarbg
+
+To remove mask in rarbg.
+
+### CustomizeKeys
+
+To customize your own shortkeys in chrome.
+
 ## Usages
 
 1. Open your chrome
