@@ -13,13 +13,13 @@ function searchSelectedText() {
   let selectedText = window.getSelection().toString();
   let searchURL = `https://www.google.com/search?q=`;
   if (selectedText) {
-    searchURL+=`${encodeURIComponent(selectedText+'meaning')}`
+    searchURL += `${encodeURIComponent(selectedText + ' meaning')}`
     window.open(searchURL, "_blank");
   } else {
     // alert("Please select text first!");
     navigator.clipboard.readText()
       .then(text => {
-        searchURL+=`${encodeURIComponent(text+'meaning')}`
+        searchURL += `${encodeURIComponent(text + 'meaning')}`
         window.open(searchURL, "_blank");
       })
       .catch(err => {
