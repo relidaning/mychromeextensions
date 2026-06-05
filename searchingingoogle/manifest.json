@@ -15,6 +15,12 @@
         "default": "Ctrl+X"
       },
       "description": "Search selected text"
+    },
+    "search-selected-text-chinese": {
+      "suggested_key": {
+        "default": "Ctrl+Z"
+      },
+      "description": "Search selected text in Chinese"
     }
   }
 }

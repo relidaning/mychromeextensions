@@ -1,26 +1,29 @@
 chrome.commands.onCommand.addListener(function (command) {
-  if (command === "search-selected-text") {
+  const suffixMap = {
+    "search-selected-text": " meaning",
+    "search-selected-text-chinese": " 中文"
+  };
+  const suffix = suffixMap[command];
+  if (suffix) {
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       chrome.scripting.executeScript({
         target: { tabId: tabs[0].id },
-        function: searchSelectedText
+        func: searchWithSuffix,
+        args: [suffix]
       });
     });
   }
 });
 
-function searchSelectedText() {
+function searchWithSuffix(suffix) {
   let selectedText = window.getSelection().toString();
-  let searchURL = `https://www.google.com/search?q=`;
+  const searchURL = `https://www.google.com/search?q=`;
   if (selectedText) {
-    searchURL += `${encodeURIComponent(selectedText + ' meaning')}`
-    window.open(searchURL, "_blank");
+    window.open(searchURL + encodeURIComponent(selectedText + suffix), "_blank");
   } else {
-    // alert("Please select text first!");
     navigator.clipboard.readText()
       .then(text => {
-        searchURL += `${encodeURIComponent(text + 'meaning')}`
-        window.open(searchURL, "_blank");
+        window.open(searchURL + encodeURIComponent(text + suffix), "_blank");
       })
       .catch(err => {
         console.error("无法访问剪贴板:", err);
