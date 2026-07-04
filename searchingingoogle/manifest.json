@@ -2,9 +2,12 @@
   "manifest_version": 3,
   "name": "Quick Google Search",
   "description": "Search selected text in Google with a shortcut.",
-  "version": "1.0",
+  "version": "1.1",
   "permissions": [
     "activeTab", "scripting", "clipboardRead"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:27123/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -21,6 +24,12 @@
         "default": "Ctrl+Z"
       },
       "description": "Search selected text in Chinese"
+    },
+    "record-selected-text": {
+      "suggested_key": {
+        "default": "Ctrl+B"
+      },
+      "description": "Record selected text to Obsidian diary"
     }
   }
 }

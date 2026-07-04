@@ -1,0 +1,1 @@
+CLAUDE.md updated: added a `## Key Concepts` section documenting the Chrome PDF viewer script-injection limitation and the `contextMenus` workaround, and updated the `searchingingoogle` summary to include the Ctrl+Z / " 中文" shortcut added in the recent commit.
