@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Video Speed Control",
+  "version": "1.0",
+  "description": "Ctrl+Up to speed up video playback, Ctrl+Down to slow it down.",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}
