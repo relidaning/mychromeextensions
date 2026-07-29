@@ -22,6 +22,10 @@ To remove mask in rarbg.
 
 To customize your own shortkeys in chrome.
 
+### VideoSpeed
+
+Press 'alt+up'/'alt+down' to speed up/slow down the video you are watching. On YouTube it also auto-skips ads: mutes and speeds through them, and clicks the skip button as soon as it's available.
+
 ## Usages
 
 1. Open your chrome
