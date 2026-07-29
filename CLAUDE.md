@@ -30,7 +30,7 @@ The `customizekeys` extension is a skeleton with only a manifest (no logic yet).
 | `searchingingoogle` | `Ctrl+X` searches selected text (falls back to clipboard) on Google appending " meaning"; `Ctrl+Z` does the same appending " 中文" for Chinese explanation |
 | `rmmaskinrarbg` | Removes the `<ab-detector>` element injected by rarbg's anti-adblock overlay |
 | `customizekeys` | Stub for custom keyboard shortcuts |
-| `videospeed` | `Ctrl+↑` speeds up the active `<video>` on the page by 0.25x, `Ctrl+↓` slows it down (0.25x–4x range), with a brief on-screen toast |
+| `videospeed` | `Alt+↑` speeds up the active `<video>` on the page by 0.25x, `Alt+↓` slows it down (0.25x–4x range), with a brief on-screen toast; on YouTube it mutes/fast-forwards through ads and uses `chrome.debugger` (via `background.js`) to send a trusted click on the skip button once it's enabled |
 
 ## Key Concepts
 

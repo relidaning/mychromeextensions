@@ -2,6 +2,7 @@
   const STEP = 0.25;
   const MIN_RATE = 0.25;
   const MAX_RATE = 4;
+  let userDesiredRate = 1;
 
   function getActiveVideo() {
     const videos = Array.from(document.querySelectorAll('video'));
@@ -51,7 +52,7 @@
   document.addEventListener(
     'keydown',
     (event) => {
-      if (!event.ctrlKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+      if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
 
       const target = event.target;
       const tag = target && target.tagName;
@@ -66,8 +67,51 @@
       const delta = event.key === 'ArrowUp' ? STEP : -STEP;
       const newRate = Math.min(MAX_RATE, Math.max(MIN_RATE, video.playbackRate + delta));
       video.playbackRate = newRate;
+      userDesiredRate = newRate;
       showToast(video, newRate);
     },
     true
   );
+
+  if (location.hostname.endsWith('youtube.com')) {
+    const SKIP_BUTTON_SELECTOR =
+      '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button';
+    let adWasShowing = false;
+    let savedMuted = false;
+    let lastSkipAttempt = 0;
+    const SKIP_RETRY_COOLDOWN_MS = 700;
+
+    setInterval(() => {
+      const player = document.getElementById('movie_player');
+      if (!player) return;
+      const video = player.querySelector('video');
+      if (!video) return;
+
+      const skipButton = player.querySelector(SKIP_BUTTON_SELECTOR);
+      if (skipButton && parseFloat(getComputedStyle(skipButton).opacity) > 0.9) {
+        const now = Date.now();
+        if (now - lastSkipAttempt > SKIP_RETRY_COOLDOWN_MS) {
+          lastSkipAttempt = now;
+          const rect = skipButton.getBoundingClientRect();
+          chrome.runtime.sendMessage({
+            type: 'yt-skip-click',
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+          });
+        }
+      }
+
+      const adShowing =
+        player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting');
+      if (adShowing && !adWasShowing) {
+        savedMuted = video.muted;
+        video.muted = true;
+        video.playbackRate = MAX_RATE;
+      } else if (!adShowing && adWasShowing) {
+        video.muted = savedMuted;
+        video.playbackRate = userDesiredRate;
+      }
+      adWasShowing = adShowing;
+    }, 300);
+  }
 })();
