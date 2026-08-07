@@ -5,7 +5,9 @@
   let userDesiredRate = 1;
 
   function getActiveVideo() {
-    const videos = Array.from(document.querySelectorAll('video'));
+    const videos = Array.from(document.querySelectorAll('video')).filter(
+      (v) => v.clientWidth > 0 && v.clientHeight > 0
+    );
     if (videos.length === 0) return null;
     const playing = videos.filter((v) => !v.paused && !v.ended);
     const pool = playing.length > 0 ? playing : videos;
@@ -49,6 +51,15 @@
     }, 800);
   }
 
+  function applyDelta(delta) {
+    const video = getActiveVideo();
+    if (!video) return;
+    const newRate = Math.min(MAX_RATE, Math.max(MIN_RATE, video.playbackRate + delta));
+    video.playbackRate = newRate;
+    userDesiredRate = newRate;
+    showToast(video, newRate);
+  }
+
   document.addEventListener(
     'keydown',
     (event) => {
@@ -58,20 +69,22 @@
       const tag = target && target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (target && target.isContentEditable)) return;
 
-      const video = getActiveVideo();
-      if (!video) return;
-
       event.preventDefault();
       event.stopPropagation();
 
       const delta = event.key === 'ArrowUp' ? STEP : -STEP;
-      const newRate = Math.min(MAX_RATE, Math.max(MIN_RATE, video.playbackRate + delta));
-      video.playbackRate = newRate;
-      userDesiredRate = newRate;
-      showToast(video, newRate);
+      // The actual playing <video> may live in a different frame than the one
+      // that has keyboard focus (e.g. a cross-origin iframe embed, which never
+      // gets focus on autoplay) - relay through the background page so every
+      // frame in the tab gets a chance to find and adjust its own video.
+      chrome.runtime.sendMessage({ type: 'speed-broadcast', delta });
     },
     true
   );
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'speed-apply') applyDelta(message.delta);
+  });
 
   if (location.hostname.endsWith('youtube.com')) {
     const SKIP_BUTTON_SELECTOR =
@@ -81,11 +94,30 @@
     let lastSkipAttempt = 0;
     const SKIP_RETRY_COOLDOWN_MS = 700;
 
+    // The "ad blocker detected" wall is a separate ytd-enforcement-message-view-model
+    // dialog (not a skippable ad) that YouTube injects and uses to pause the player.
+    // It has no dismiss button in its current form, so the only way past it is to
+    // tear the dialog + its backdrop out of the DOM and resume playback ourselves.
+    function removeAdblockWall() {
+      const message = document.querySelector('ytd-enforcement-message-view-model');
+      if (!message) return false;
+      const dialog = message.closest('tp-yt-paper-dialog') || message;
+      dialog.remove();
+      document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach((el) => el.remove());
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+      return true;
+    }
+
     setInterval(() => {
       const player = document.getElementById('movie_player');
       if (!player) return;
       const video = player.querySelector('video');
       if (!video) return;
+
+      if (removeAdblockWall() && video.paused) {
+        video.play().catch(() => {});
+      }
 
       const skipButton = player.querySelector(SKIP_BUTTON_SELECTOR);
       if (skipButton && parseFloat(getComputedStyle(skipButton).opacity) > 0.9) {
