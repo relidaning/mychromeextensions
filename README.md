@@ -24,7 +24,7 @@ To customize your own shortkeys in chrome.
 
 ### VideoSpeed
 
-Press 'alt+up'/'alt+down' to speed up/slow down the video you are watching, and the left/right arrow keys to seek backward/forward 15 seconds (only kicks in when the page has a video, so it won't hijack arrows elsewhere). On YouTube it also auto-skips ads: it mutes each ad and seeks it straight to the end, which works on non-skippable ads too.
+Press 'alt+up'/'alt+down' to speed up/slow down the video you are watching, and the left/right arrow keys to seek backward/forward 15 seconds, and Space to play/pause (these only kick in when the page has a video, so they won't hijack the keys elsewhere). On YouTube it also auto-skips ads: it mutes each ad and seeks it straight to the end, which works on non-skippable ads too.
 
 ### RegexFilter
 

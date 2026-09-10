@@ -76,10 +76,17 @@
     showToast(video, `${delta > 0 ? '+' : ''}${delta}s`);
   }
 
-  // Arrow keys we've consumed on keydown and must also swallow on the matching
-  // keyup, since some players (video.js's bundled hotkeys, and this or that
-  // site's own handler) do their seeking on keyUP - without this our jump gets
-  // stacked on top of theirs and the video lands in the wrong place.
+  function togglePlay(video) {
+    const willPlay = video.paused;
+    if (willPlay) video.play().catch(() => {});
+    else video.pause();
+    showToast(video, willPlay ? '▶' : '⏸');
+  }
+
+  // Keys we've consumed on keydown and must also swallow on the matching keyup,
+  // since some players (video.js's bundled hotkeys, and this or that site's own
+  // handler) act on keyUP - Space toggles play there, arrows seek there. Without
+  // swallowing the keyup our action gets undone (Space) or stacked on (arrows).
   const consumedKeys = new Set();
 
   document.addEventListener(
@@ -89,14 +96,11 @@
       const tag = target && target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (target && target.isContentEditable)) return;
 
+      const noMods = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
       const isSpeedKey = event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown');
-      const isSeekKey =
-        !event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.shiftKey &&
-        (event.key === 'ArrowLeft' || event.key === 'ArrowRight');
-      if (!isSpeedKey && !isSeekKey) return;
+      const isSeekKey = noMods && (event.key === 'ArrowLeft' || event.key === 'ArrowRight');
+      const isPlayPauseKey = noMods && (event.key === ' ' || event.code === 'Space');
+      if (!isSpeedKey && !isSeekKey && !isPlayPauseKey) return;
 
       if (isSpeedKey) {
         event.preventDefault();
@@ -110,19 +114,25 @@
         return;
       }
 
-      // Seek: only take over Left/Right when THIS frame actually has a video to
-      // act on. That keeps the plain arrow keys untouched on pages that use them
-      // for scrolling, carousels or slideshows, and lets a cross-origin embed
-      // still work once it's been clicked (its own copy of this script, running
-      // inside that iframe, then owns the keydown). stopImmediatePropagation +
-      // the keyup swallow below mean sites that already seek on arrows - YouTube,
-      // video.js, etc. - are fully pre-empted, so the jump stays one SEEK_STEP.
+      // Space would otherwise activate a focused button / link / select - leave
+      // those alone.
+      if (isPlayPauseKey && (tag === 'BUTTON' || tag === 'SELECT' || tag === 'A')) return;
+
+      // Seek and play/pause only take over when THIS frame actually has a video
+      // to act on. That keeps the keys untouched on pages that use them for
+      // scrolling / carousels / slideshows, and lets a cross-origin embed still
+      // work once it's been clicked (its own copy of this script, running inside
+      // that iframe, then owns the keydown). stopImmediatePropagation + the keyup
+      // swallow below fully pre-empt players that already handle these keys
+      // (YouTube, video.js, ...) so a press does exactly one thing.
       const video = getActiveVideo();
       if (!video) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       consumedKeys.add(event.key);
-      applySeek(event.key === 'ArrowRight' ? SEEK_STEP : -SEEK_STEP, video);
+      if (event.repeat) return;
+      if (isSeekKey) applySeek(event.key === 'ArrowRight' ? SEEK_STEP : -SEEK_STEP, video);
+      else togglePlay(video);
     },
     true
   );
