@@ -1,5 +1,14 @@
 # Sessions
 
+## 2026-08-27 — Q&A: Brave on Hyprland (no repo changes)
+Environment troubleshooting unrelated to this repo's extensions: fixed Brave crashing on native Wayland under Hyprland (color-management "Custom primaries aren't supported" trap) with `--ozone-platform=x11`, added `--proxy-server="http://127.0.0.1:10808"` since Brave wasn't inheriting the xray proxy on a non-GNOME session, and `--incognito`, all baked into a user-level `~/.local/share/applications/brave-browser.desktop` override; also added a Hyprland workspace rule (`class:^([Bb]rave-browser)$` → workspace 3) in the dotfiles repo, and explained Chrome's external-protocol prompt and querying the Brave history SQLite DB. No changes to this repo.
+
+## 2026-08-19 — Q&A: xdg-open popup on Douyin is not from this repo
+User asked whether an `xdg-open` dialog that appeared on a Douyin tab was a script from this repo and whether it could be disabled per-URL. Confirmed via grep that no extension here references `xdg-open` or `douyin`, and explained extensions can't spawn OS processes anyway — the popup is Chrome's own Linux external-protocol-handler prompt (deep-linking to Douyin's native app), fixable via that site's protocol-handler permission in `chrome://settings`, not through this codebase. No code changes.
+
+## 2026-08-11 — VideoSpeed: drop chrome.debugger, skip ads by seeking to end
+Root-caused the black/unplayable YouTube player: the `chrome.debugger` skip-click attached the debugger, whose native infobar resized the viewport, so the trusted click landed off-target, tripped the ad-blocker enforcement wall, and left the player with a torn-down MediaSource. Replaced it with `video.currentTime = video.duration` (guarded by `Number.isFinite(duration)` since YouTube reports `Infinity` while an ad loads), which needs no trusted input and also handles non-skippable ads; removed the `debugger` permission and the whole `yt-skip-click` path from `background.js`, dropped the pointless 4x-through-ads behavior, and added a one-shot page reload if the player is still dead 3s after the wall is torn out. Ad-detection classes and the enforcement-dialog selector could not be verified against live YouTube from this environment.
+
 ## 2026-08-07 — Docs housekeeping: summarize prior VideoSpeed debugging session
 Meta/documentation-only session: reviewed transcript 98b868c6 (adblock-wall auto-dismiss feature + unresolved Alt+Up regression investigation) and appended the summary entry below to SESSION.md. Made no code changes and no further CLAUDE.md edits, since the adblock-wall doc update was already applied to the working tree by that prior session and the Alt+Up bug had no confirmed root cause yet to document.
 

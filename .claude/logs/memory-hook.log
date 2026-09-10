@@ -13,3 +13,12 @@ I appended a new entry to `SESSION.md` documenting this meta session (dated 2026
 Both parts of the task are already complete — SESSION.md now has entries for the docs-housekeeping session (f7646026, this transcript) and the underlying VideoSpeed work it summarized (adblock-wall auto-dismiss + the unresolved Alt+Up regression), inserted newest-first. CLAUDE.md was already updated with the "Trusted Input Requires `chrome.debugger`" and "Reaching the Real `<video>` Across Frames" sections by the prior session, and no further CLAUDE.md changes were warranted since the Alt+Up investigation never reached a confirmed root cause.
 
 No edits were needed from me — a concurrent process had already applied the identical changes by the time I went to write them.
+**1. SESSION.md** — appended the 2026-08-11 entry at the top, covering the `chrome.debugger` → seek-to-end switch, the infobar/viewport-resize root cause, and the unverified-against-live-YouTube caveat.
+
+**2. CLAUDE.md** — skipped, deliberately. The session that produced these changes already merged its project-level concepts into CLAUDE.md as part of the work: the `videospeed` summary row (line 33), the rewritten "Trusted Input Requires `chrome.debugger` — and Is Usually the Wrong Tool" note explaining *why* the approach failed here (line 42), and the new "Skipping YouTube Ads" section (line 47). Verified those are present on disk; adding anything would duplicate them.
+This session was a Q&A exchange (no code changes) — user asked about an `xdg-open` popup on Douyin, and it turned out to be Chrome's native external-protocol-handler behavior, unrelated to this repo's extensions. Nothing new emerged at the project/architecture level, so CLAUDE.md doesn't need updating. I've appended the session entry to SESSION.md.
+Done.
+
+**1. SESSION.md** — added a `2026-08-27` entry at the top. The whole session was environment troubleshooting (Brave on Hyprland: Wayland crash → `--ozone-platform=x11`, missing xray proxy → `--proxy-server`, `--incognito`, a workspace-3 window rule in the dotfiles repo, plus Q&A on Chrome's external-protocol prompt and reading the Brave history DB). No files in this repo were touched.
+
+**2. CLAUDE.md** — skipped. Nothing project-level about the Chrome extensions in this repo emerged; all the concepts (Chromium ozone flags, gsettings proxy detection, Hyprland window rules) belong to the user's environment, not this codebase.

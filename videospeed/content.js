@@ -2,15 +2,21 @@
   const STEP = 0.25;
   const MIN_RATE = 0.25;
   const MAX_RATE = 4;
+  const SEEK_STEP = 15; // seconds jumped per Left/Right arrow press
   let userDesiredRate = 1;
 
   function getActiveVideo() {
-    const videos = Array.from(document.querySelectorAll('video')).filter(
-      (v) => v.clientWidth > 0 && v.clientHeight > 0
-    );
-    if (videos.length === 0) return null;
-    const playing = videos.filter((v) => !v.paused && !v.ended);
-    const pool = playing.length > 0 ? playing : videos;
+    const all = Array.from(document.querySelectorAll('video'));
+    if (all.length === 0) return null;
+    // Prefer on-screen videos, but fall back to any element that has actually
+    // loaded media: some players (e.g. video.js when it is not in "fluid" mode)
+    // briefly report a 0x0 box for the real <video>, which the strict size
+    // filter alone would drop, leaving the shortcut with nothing to act on.
+    let pool = all.filter((v) => v.clientWidth > 0 && v.clientHeight > 0);
+    if (pool.length === 0) pool = all.filter((v) => v.readyState > 0 || v.currentSrc);
+    if (pool.length === 0) return null;
+    const playing = pool.filter((v) => !v.paused && !v.ended);
+    if (playing.length > 0) pool = playing;
     return pool.reduce((largest, v) => {
       const area = v.clientWidth * v.clientHeight;
       const largestArea = largest.clientWidth * largest.clientHeight;
@@ -18,7 +24,7 @@
     }, pool[0]);
   }
 
-  function showToast(video, rate) {
+  function showToast(video, text) {
     let toast = video._speedToast;
     if (!toast || !toast.isConnected) {
       toast = document.createElement('div');
@@ -43,7 +49,7 @@
       container.appendChild(toast);
       video._speedToast = toast;
     }
-    toast.textContent = `${rate.toFixed(2)}x`;
+    toast.textContent = text;
     toast.style.opacity = '1';
     clearTimeout(video._speedToastTimer);
     video._speedToastTimer = setTimeout(() => {
@@ -57,27 +63,77 @@
     const newRate = Math.min(MAX_RATE, Math.max(MIN_RATE, video.playbackRate + delta));
     video.playbackRate = newRate;
     userDesiredRate = newRate;
-    showToast(video, newRate);
+    showToast(video, `${newRate.toFixed(2)}x`);
   }
+
+  function applySeek(delta, video) {
+    video = video || getActiveVideo();
+    if (!video) return;
+    const duration = video.duration;
+    let next = video.currentTime + delta;
+    next = Math.max(0, Number.isFinite(duration) ? Math.min(duration, next) : next);
+    video.currentTime = next;
+    showToast(video, `${delta > 0 ? '+' : ''}${delta}s`);
+  }
+
+  // Arrow keys we've consumed on keydown and must also swallow on the matching
+  // keyup, since some players (video.js's bundled hotkeys, and this or that
+  // site's own handler) do their seeking on keyUP - without this our jump gets
+  // stacked on top of theirs and the video lands in the wrong place.
+  const consumedKeys = new Set();
 
   document.addEventListener(
     'keydown',
     (event) => {
-      if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
-
       const target = event.target;
       const tag = target && target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (target && target.isContentEditable)) return;
 
-      event.preventDefault();
-      event.stopPropagation();
+      const isSpeedKey = event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown');
+      const isSeekKey =
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        (event.key === 'ArrowLeft' || event.key === 'ArrowRight');
+      if (!isSpeedKey && !isSeekKey) return;
 
-      const delta = event.key === 'ArrowUp' ? STEP : -STEP;
-      // The actual playing <video> may live in a different frame than the one
-      // that has keyboard focus (e.g. a cross-origin iframe embed, which never
-      // gets focus on autoplay) - relay through the background page so every
-      // frame in the tab gets a chance to find and adjust its own video.
-      chrome.runtime.sendMessage({ type: 'speed-broadcast', delta });
+      if (isSpeedKey) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const delta = event.key === 'ArrowUp' ? STEP : -STEP;
+        // The actual playing <video> may live in a different frame than the one
+        // that has keyboard focus (e.g. a cross-origin iframe embed, which never
+        // gets focus on autoplay) - relay through the background page so every
+        // frame in the tab gets a chance to find and adjust its own video.
+        chrome.runtime.sendMessage({ type: 'speed-broadcast', delta });
+        return;
+      }
+
+      // Seek: only take over Left/Right when THIS frame actually has a video to
+      // act on. That keeps the plain arrow keys untouched on pages that use them
+      // for scrolling, carousels or slideshows, and lets a cross-origin embed
+      // still work once it's been clicked (its own copy of this script, running
+      // inside that iframe, then owns the keydown). stopImmediatePropagation +
+      // the keyup swallow below mean sites that already seek on arrows - YouTube,
+      // video.js, etc. - are fully pre-empted, so the jump stays one SEEK_STEP.
+      const video = getActiveVideo();
+      if (!video) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      consumedKeys.add(event.key);
+      applySeek(event.key === 'ArrowRight' ? SEEK_STEP : -SEEK_STEP, video);
+    },
+    true
+  );
+
+  document.addEventListener(
+    'keyup',
+    (event) => {
+      if (!consumedKeys.has(event.key)) return;
+      consumedKeys.delete(event.key);
+      event.preventDefault();
+      event.stopImmediatePropagation();
     },
     true
   );
@@ -87,12 +143,11 @@
   });
 
   if (location.hostname.endsWith('youtube.com')) {
-    const SKIP_BUTTON_SELECTOR =
-      '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button';
+    const WALL_RECOVERY_GRACE_MS = 3000;
     let adWasShowing = false;
     let savedMuted = false;
-    let lastSkipAttempt = 0;
-    const SKIP_RETRY_COOLDOWN_MS = 700;
+    let wallRemovedAt = 0;
+    let reloadedForWall = false;
 
     // The "ad blocker detected" wall is a separate ytd-enforcement-message-view-model
     // dialog (not a skippable ad) that YouTube injects and uses to pause the player.
@@ -115,32 +170,43 @@
       const video = player.querySelector('video');
       if (!video) return;
 
-      if (removeAdblockWall() && video.paused) {
-        video.play().catch(() => {});
+      if (removeAdblockWall()) {
+        if (!wallRemovedAt) wallRemovedAt = Date.now();
+        if (video.paused) video.play().catch(() => {});
       }
 
-      const skipButton = player.querySelector(SKIP_BUTTON_SELECTOR);
-      if (skipButton && parseFloat(getComputedStyle(skipButton).opacity) > 0.9) {
-        const now = Date.now();
-        if (now - lastSkipAttempt > SKIP_RETRY_COOLDOWN_MS) {
-          lastSkipAttempt = now;
-          const rect = skipButton.getBoundingClientRect();
-          chrome.runtime.sendMessage({
-            type: 'yt-skip-click',
-            x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2,
-          });
+      // By the time the wall is on screen YouTube has often already torn down the
+      // player's MediaSource, so removing the dialog leaves a permanently black
+      // frame that play() can never revive. Reloading rebuilds the player; guard
+      // it so a wall that keeps reappearing can't put us in a reload loop.
+      if (wallRemovedAt && !reloadedForWall) {
+        if (video.readyState > 0 && !video.error) {
+          wallRemovedAt = 0;
+        } else if (Date.now() - wallRemovedAt > WALL_RECOVERY_GRACE_MS) {
+          reloadedForWall = true;
+          location.reload();
+          return;
         }
       }
 
       const adShowing =
         player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting');
-      if (adShowing && !adWasShowing) {
-        savedMuted = video.muted;
+
+      if (adShowing) {
+        if (!adWasShowing) savedMuted = video.muted;
         video.muted = true;
-        video.playbackRate = MAX_RATE;
-      } else if (!adShowing && adWasShowing) {
+        // Seeking the ad to its end is what actually dismisses it. It needs no
+        // trusted click (so no chrome.debugger, and no "started debugging this
+        // browser" infobar reflowing the page out from under us), and it works
+        // on non-skippable ads too, which a Skip button click never could.
+        if (Number.isFinite(video.duration) && video.duration > 0) {
+          if (video.currentTime < video.duration - 0.15) video.currentTime = video.duration;
+          if (video.paused) video.play().catch(() => {});
+        }
+      } else if (adWasShowing) {
         video.muted = savedMuted;
+        // The ad and the feature share one <video>, and YouTube resets its rate
+        // when it swaps the source back, so re-apply what the user asked for.
         video.playbackRate = userDesiredRate;
       }
       adWasShowing = adShowing;

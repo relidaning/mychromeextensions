@@ -1,9 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Video Speed Control",
-  "version": "1.0",
-  "description": "Alt+Up to speed up video playback, Alt+Down to slow it down. Also auto-skips YouTube ads.",
-  "permissions": ["debugger"],
+  "version": "1.2",
+  "description": "Alt+Up/Down to speed up/slow down video playback, Left/Right arrows to seek 15s. Also auto-skips YouTube ads.",
   "background": {
     "service_worker": "background.js"
   },
