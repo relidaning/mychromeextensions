@@ -51,11 +51,17 @@ async function recordToObsidian(text) {
   const dateHeading = dateStr;
   const newEntry = `- ${timeStr} ${text}`;
 
+  // Only a 404 means "no diary for this month yet". Any other failure (Obsidian
+  // closed, auth error, 5xx) must abort: the PUT below replaces the whole file,
+  // so treating it as empty would wipe the month's diary down to one entry.
   let existing = null;
   try {
     const resp = await fetch(`${OBSIDIAN_URL}/vault/${filePath}`, { headers: authHeader });
     if (resp.ok) existing = await resp.text();
-  } catch (e) {}
+    else if (resp.status !== 404) return false;
+  } catch (e) {
+    return false;
+  }
 
   const newContent = buildContent(existing, dateHeading, newEntry);
 
