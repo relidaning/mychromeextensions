@@ -124,18 +124,37 @@
   }
 
   function clearHighlights() {
+    // Fold each mark's text (and the text node after it) straight into the
+    // neighbouring text node, so the split-up original comes back as one node
+    // without calling parent.normalize() per mark - that re-walked the whole
+    // parent every time and took seconds on a text block with thousands of hits.
     document.querySelectorAll(`mark.${HIGHLIGHT_CLASS}`).forEach((mark) => {
       const parent = mark.parentNode;
       if (!parent) return;
-      parent.replaceChild(document.createTextNode(mark.textContent), mark);
-      parent.normalize();
+      const prev = mark.previousSibling;
+      const next = mark.nextSibling;
+      let textNode;
+      if (prev && prev.nodeType === Node.TEXT_NODE) {
+        textNode = prev;
+        textNode.appendData(mark.textContent);
+        mark.remove();
+      } else {
+        textNode = document.createTextNode(mark.textContent);
+        parent.replaceChild(textNode, mark);
+      }
+      if (next && next.nodeType === Node.TEXT_NODE) {
+        textNode.appendData(next.data);
+        next.remove();
+      }
     });
     matches = [];
     currentIndex = -1;
   }
 
   function setCurrent(index) {
-    matches.forEach((m, i) => m.classList.toggle(CURRENT_CLASS, i === index));
+    // Only one mark carries CURRENT_CLASS, so swap it instead of touching every match.
+    document.querySelectorAll(`mark.${CURRENT_CLASS}`).forEach((m) => m.classList.remove(CURRENT_CLASS));
+    if (matches[index]) matches[index].classList.add(CURRENT_CLASS);
     if (index >= 0 && matches[index]) {
       matches[index].scrollIntoView({ block: 'center', inline: 'nearest' });
     }
