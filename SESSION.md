@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-02 — Unattended optimize pass #6: findings only, no PR
+Sixth automated visit found only the docs commit `45acd21` new since pass #5 (PRs #1/#2 still open, videospeed edits uncommitted since 2026-09-21), so it again created no branch or worktree and took no new measurements. One new finding: `CLAUDE.md` now states the "only a 404 on the diary GET means new file" rule, but `searchingingoogle/background.js` on `master` (the version Chrome runs) still treats every failed GET as a new file and overwrites the month, because the fix is only in unmerged PR #1.
+
 ## 2026-10-02 — Unattended optimize pass #5: findings only, no PR
 Fifth automated visit found the same state as pass #4 (PRs #1/#2 open and mergeable, `master` at `f5c58e1`, videospeed edits uncommitted since 2026-09-21), so it created no branch or worktree and took no new measurements. All findings carry over unchanged: the YouTube `setInterval` rework still waits on the uncommitted videospeed edits, and the rest are in the open PRs, need a user decision, or are too small for a third open PR. Later visits will repeat this report until the PRs are merged or the videospeed work is committed.
 
