@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-03 — Unattended PR review: merged #1, closed #2
+Reviewed the two open optimize PRs in a separate worktree on top of current `master`. #1 (searchingingoogle: only a 404 diary GET means "new file") was confirmed with a Node mocked-`fetch` harness (500/401/network errors no longer overwrite the month) and squash-merged as `9978d3d`; Chrome only runs it after the "Quick Google Search" card is reloaded. #2 (regexfilter linear-time clear/step) was closed: the faster Enter stepping held up (~3 ms → ~0.12 ms per press), but the ~2.3 s → ~0.1 s clear was only true when Esc runs before the highlights are drawn. After the page has drawn them, clearing a long `<pre>` was slower than before (20k matches: ~2.75 s → ~3.05 s), so the suggested redo is to keep the stepping change and replace each run of text and marks with a single text node.
+
 ## 2026-10-02 — Unattended optimize pass #6: findings only, no PR
 Sixth automated visit found only the docs commit `45acd21` new since pass #5 (PRs #1/#2 still open, videospeed edits uncommitted since 2026-09-21), so it again created no branch or worktree and took no new measurements. One new finding: `CLAUDE.md` now states the "only a 404 on the diary GET means new file" rule, but `searchingingoogle/background.js` on `master` (the version Chrome runs) still treats every failed GET as a new file and overwrites the month, because the fix is only in unmerged PR #1.
 
