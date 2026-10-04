@@ -8,6 +8,7 @@
   let counterEl = null;
   let matches = [];
   let currentIndex = -1;
+  let currentMark = null;
   let lastSearchedPattern = null;
 
   function injectStyle() {
@@ -124,20 +125,54 @@
   }
 
   function clearHighlights() {
+    // Rebuild each run of text + marks as one text node in a single DOM edit.
+    // Unwrapping mark by mark and calling parent.normalize() each time re-walked
+    // (and re-laid-out) the whole parent per match: seconds on a block with
+    // thousands of hits.
+    const parents = new Set();
     document.querySelectorAll(`mark.${HIGHLIGHT_CLASS}`).forEach((mark) => {
-      const parent = mark.parentNode;
-      if (!parent) return;
-      parent.replaceChild(document.createTextNode(mark.textContent), mark);
-      parent.normalize();
+      if (mark.parentNode) parents.add(mark.parentNode);
     });
+    const isMark = (n) => n.nodeType === Node.ELEMENT_NODE && n.nodeName === 'MARK' && n.classList.contains(HIGHLIGHT_CLASS);
+    // One Range for everything: every live Range has to be fixed up on each DOM
+    // mutation, so one per run would make this quadratic again.
+    const range = document.createRange();
+    for (const parent of parents) {
+      let node = parent.firstChild;
+      while (node) {
+        if (node.nodeType !== Node.TEXT_NODE && !isMark(node)) {
+          node = node.nextSibling;
+          continue;
+        }
+        const first = node;
+        let last = node;
+        let hasMark = false;
+        const parts = [];
+        while (node && (node.nodeType === Node.TEXT_NODE || isMark(node))) {
+          if (node.nodeType !== Node.TEXT_NODE) hasMark = true;
+          parts.push(node.textContent);
+          last = node;
+          node = node.nextSibling;
+        }
+        if (!hasMark) continue;
+        range.setStartBefore(first);
+        range.setEndAfter(last);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(parts.join('')));
+      }
+    }
     matches = [];
     currentIndex = -1;
+    currentMark = null;
   }
 
   function setCurrent(index) {
-    matches.forEach((m, i) => m.classList.toggle(CURRENT_CLASS, i === index));
-    if (index >= 0 && matches[index]) {
-      matches[index].scrollIntoView({ block: 'center', inline: 'nearest' });
+    // Only one mark carries CURRENT_CLASS, so swap it instead of touching every match.
+    if (currentMark) currentMark.classList.remove(CURRENT_CLASS);
+    currentMark = matches[index] || null;
+    if (currentMark) {
+      currentMark.classList.add(CURRENT_CLASS);
+      currentMark.scrollIntoView({ block: 'center', inline: 'nearest' });
     }
   }
 
