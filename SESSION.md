@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-05 — Unattended optimize pass #7: regexfilter linear-time clear/step redo (PR #3)
+Redid closed PR #2 the way its review suggested: `clearHighlights()` in `regexfilter/content.js` now replaces each run of text nodes and marks with a single text node, and `setCurrent()` swaps the class on two marks only; delivered on branch `opt/mychromeextensions-20261005-0441` as PR #3 (open, not merged). Measured in headless Chromium with the highlights rendered before Esc (where #2 regressed), clearing 20k matches in one `<pre>` went from ~2.8 s to ~90 ms with identical DOM output; a first version that made one `Range` per run slowed the 46k-match page to ~1.5 s, so all runs share one `Range`. The videospeed YouTube poll (uncommitted edits), the hard-coded Obsidian token, and the match cap are still left for the user.
+
 ## 2026-10-03 — Unattended PR review: merged #1, closed #2
 Reviewed the two open optimize PRs in a separate worktree on top of current `master`. #1 (searchingingoogle: only a 404 diary GET means "new file") was confirmed with a Node mocked-`fetch` harness (500/401/network errors no longer overwrite the month) and squash-merged as `9978d3d`; Chrome only runs it after the "Quick Google Search" card is reloaded. #2 (regexfilter linear-time clear/step) was closed: the faster Enter stepping held up (~3 ms → ~0.12 ms per press), but the ~2.3 s → ~0.1 s clear was only true when Esc runs before the highlights are drawn. After the page has drawn them, clearing a long `<pre>` was slower than before (20k matches: ~2.75 s → ~3.05 s), so the suggested redo is to keep the stepping change and replace each run of text and marks with a single text node.
 
