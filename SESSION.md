@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-05 — Unattended PR review: merged #3 (regexfilter linear-time clear/step)
+Reviewed PR #3 in a separate worktree on top of `master` `f88244e` with an independently written headless-Chromium (Playwright) benchmark that loads the real `content.js` from both versions and renders the highlights before every timed step (the case where #2 regressed). The claim was reproduced with identical behaviour and DOM restore on four test pages (Esc at 20k matches in one `<pre>`: ~2.8 s → ~90–100 ms; Enter ~2.8 ms → ~1.1 ms; initial search unchanged), so it was squash-merged as `e9d8fb2`; Chrome only runs it after the "Regex Highlight Filter" card is reloaded. The merged branch `opt/mychromeextensions-20261005-0441` was not deleted (the task forbade it), and the videospeed uncommitted edits, the hard-coded Obsidian token, and the match cap are still left for the user.
+
 ## 2026-10-05 — Unattended optimize pass #7: regexfilter linear-time clear/step redo (PR #3)
 Redid closed PR #2 the way its review suggested: `clearHighlights()` in `regexfilter/content.js` now replaces each run of text nodes and marks with a single text node, and `setCurrent()` swaps the class on two marks only; delivered on branch `opt/mychromeextensions-20261005-0441` as PR #3 (open, not merged). Measured in headless Chromium with the highlights rendered before Esc (where #2 regressed), clearing 20k matches in one `<pre>` went from ~2.8 s to ~90 ms with identical DOM output; a first version that made one `Range` per run slowed the 46k-match page to ~1.5 s, so all runs share one `Range`. The videospeed YouTube poll (uncommitted edits), the hard-coded Obsidian token, and the match cap are still left for the user.
 
