@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-06 — Unattended optimize pass #8: searchingingoogle serialized Ctrl+B saves (PR #4)
+Eighth automated visit found that overlapping `Ctrl+B` saves lose diary entries, because each save is a GET then a PUT of the whole month (Node `vm` harness with a mocked 20 ms `fetch`: 5 overlapping saves all toasted "Recorded" but only 1 of 5 entries was kept); `recordToObsidian()` now queues each save behind the previous one (a failed save does not block the next), and the command handlers no longer throw when there is no active tab or `executeScript` rejects. Delivered on branch `opt/mychromeextensions-20261006-0357` as PR #4 (open, not merged, not tested in a real browser or against the real Obsidian API), so `CLAUDE.md` was left unchanged until the fix is on `master`; the videospeed YouTube poll (uncommitted edits), the hard-coded Obsidian token, and the regexfilter match cap are still left for the user.
+
 ## 2026-10-05 — Session log housekeeping for the videospeed Brave check
 A log-only session: it read the transcript of the videospeed Brave check, added that entry below, and committed and pushed `SESSION.md` alone as `ee2b43d`; no code was touched. `CLAUDE.md` was left unchanged because the Brave check only verified existing behaviour, and the uncommitted `videospeed/` edits and `findmy-proximity/` were left as they were since that session did not make them.
 
