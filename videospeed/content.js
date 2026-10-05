@@ -152,6 +152,26 @@
     if (message.type === 'speed-apply') applyDelta(message.delta);
   });
 
+  // Douyin's player cancels every keydown while a video is open, whatever
+  // modifiers are held, and runs its single-letter hotkeys even with Alt/Ctrl
+  // down (Alt+C favourites the video). That kills every browser shortcut a page
+  // is allowed to cancel: Alt+1..9, Alt+Left, Ctrl+F, Ctrl+L, F5, F12, ...
+  // Hide modifier combos and function keys from the page so Chrome handles
+  // them; plain keys still reach Douyin's own hotkeys.
+  if (location.hostname.endsWith('douyin.com')) {
+    const hideFromPage = (event) => {
+      const target = event.target;
+      const tag = target && target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (target && target.isContentEditable)) return;
+      const isFunctionKey = /^F\d{1,2}$/.test(event.key);
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && !isFunctionKey) return;
+      event.stopImmediatePropagation();
+    };
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      window.addEventListener(type, hideFromPage, true);
+    }
+  }
+
   if (location.hostname.endsWith('youtube.com')) {
     const WALL_RECOVERY_GRACE_MS = 3000;
     let adWasShowing = false;
