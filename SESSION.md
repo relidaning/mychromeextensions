@@ -1,5 +1,8 @@
 # Sessions
 
+## 2026-10-05 — videospeed in Brave: verified working, no code change
+Asked to make `videospeed` work in Brave; nothing was changed, because it already does: the user's Brave profile has it loaded unpacked, enabled, with "Allow in Private" on, and a throwaway headless Brave 151 (Playwright over CDP, local ffmpeg test page, video both in the page and in an iframe, normal and `--incognito`) responded correctly to `Alt+↑`, `→` and `Space`. Real sites (YouTube, Douyin) and Brave Shields were not covered, so the open question back to the user is which site and key fail; the likely causes are tabs opened before the extension was (re)loaded and focus sitting in a text box.
+
 ## 2026-10-05 — Unattended PR review: merged #3 (regexfilter linear-time clear/step)
 Reviewed PR #3 in a separate worktree on top of `master` `f88244e` with an independently written headless-Chromium (Playwright) benchmark that loads the real `content.js` from both versions and renders the highlights before every timed step (the case where #2 regressed). The claim was reproduced with identical behaviour and DOM restore on four test pages (Esc at 20k matches in one `<pre>`: ~2.8 s → ~90–100 ms; Enter ~2.8 ms → ~1.1 ms; initial search unchanged), so it was squash-merged as `e9d8fb2`; Chrome only runs it after the "Regex Highlight Filter" card is reloaded. The merged branch `opt/mychromeextensions-20261005-0441` was not deleted (the task forbade it), and the videospeed uncommitted edits, the hard-coded Obsidian token, and the match cap are still left for the user.
 
