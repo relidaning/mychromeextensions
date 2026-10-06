@@ -4,20 +4,25 @@ const OBSIDIAN_URL = 'http://127.0.0.1:27123';
 chrome.commands.onCommand.addListener(function (command) {
   if (command === "record-selected-text") {
     chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id },
-        func: () => window.getSelection().toString()
-      });
-      const text = results[0]?.result?.trim();
-      if (!text) return;
-      const ok = await recordToObsidian(text);
-      chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id },
-        func: showToast,
-        args: [ok
-          ? `Recorded: "${text.length > 60 ? text.slice(0, 60) + '…' : text}"`
-          : 'Failed to reach Obsidian']
-      });
+      if (!tabs[0]) return;
+      // executeScript rejects on pages we can't inject into (chrome://, the Web
+      // Store, the PDF viewer); there is nothing to record or toast on there.
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id },
+          func: () => window.getSelection().toString()
+        });
+        const text = results[0]?.result?.trim();
+        if (!text) return;
+        const ok = await recordToObsidian(text);
+        await chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id },
+          func: showToast,
+          args: [ok
+            ? `Recorded: "${text.length > 60 ? text.slice(0, 60) + '…' : text}"`
+            : 'Failed to reach Obsidian']
+        });
+      } catch (e) {}
     });
     return;
   }
@@ -29,16 +34,28 @@ chrome.commands.onCommand.addListener(function (command) {
   const suffix = suffixMap[command];
   if (suffix) {
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      if (!tabs[0]) return;
       chrome.scripting.executeScript({
         target: { tabId: tabs[0].id },
         func: searchWithSuffix,
         args: [suffix]
-      });
+      }).catch(() => {});
     });
   }
 });
 
-async function recordToObsidian(text) {
+// Saving is GET-then-PUT of the whole month, so two saves that overlap would
+// both read the same file and the second PUT would drop the first entry. Run
+// them one after another.
+let saveQueue = Promise.resolve();
+
+function recordToObsidian(text) {
+  const result = saveQueue.then(() => saveToObsidian(text));
+  saveQueue = result.catch(() => {});
+  return result;
+}
+
+async function saveToObsidian(text) {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
