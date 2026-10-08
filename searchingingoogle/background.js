@@ -1,5 +1,8 @@
 const OBSIDIAN_TOKEN = '442a69dc9bc2d9d1ebbe41219ed2cbbea7f90679f43fa65c8212a7e98fa72a34';
 const OBSIDIAN_URL = 'http://127.0.0.1:27123';
+// A request that never answers would hold up every save queued behind it, and
+// the service worker is killed after ~30s without ever showing a toast.
+const OBSIDIAN_TIMEOUT_MS = 8000;
 
 chrome.commands.onCommand.addListener(function (command) {
   if (command === "record-selected-text") {
@@ -73,7 +76,10 @@ async function saveToObsidian(text) {
   // so treating it as empty would wipe the month's diary down to one entry.
   let existing = null;
   try {
-    const resp = await fetch(`${OBSIDIAN_URL}/vault/${filePath}`, { headers: authHeader });
+    const resp = await fetch(`${OBSIDIAN_URL}/vault/${filePath}`, {
+      headers: authHeader,
+      signal: AbortSignal.timeout(OBSIDIAN_TIMEOUT_MS)
+    });
     if (resp.ok) existing = await resp.text();
     else if (resp.status !== 404) return false;
   } catch (e) {
@@ -86,7 +92,8 @@ async function saveToObsidian(text) {
     const resp = await fetch(`${OBSIDIAN_URL}/vault/${filePath}`, {
       method: 'PUT',
       headers: { ...authHeader, 'Content-Type': 'text/markdown' },
-      body: newContent
+      body: newContent,
+      signal: AbortSignal.timeout(OBSIDIAN_TIMEOUT_MS)
     });
     return resp.ok;
   } catch (e) {
@@ -99,16 +106,19 @@ function buildContent(existing, dateHeading, newEntry) {
     return `${dateHeading}\n\n${newEntry}\n`;
   }
 
-  const idx = existing.indexOf(dateHeading);
-  if (idx === -1) {
+  // A heading is a line that is just the date, or a markdown heading ending in
+  // it ("### 2026-10-05"). Matching the date anywhere would also hit an entry
+  // that merely mentions it and file the new entry under the wrong day.
+  const heading = existing.match(new RegExp(`^(#{1,6} .*)?${dateHeading}[ \\t\\r]*$`, 'm'));
+  if (!heading) {
     // No section for today yet — append at end
     return existing.trimEnd() + '\n\n' + dateHeading + '\n\n' + newEntry + '\n';
   }
 
   // Find where this date's section ends (next date heading or EOF)
-  const afterHeading = idx + dateHeading.length;
+  const afterHeading = heading.index + heading[0].length;
   const tail = existing.slice(afterHeading);
-  const nextMatch = tail.search(/\n\d{4}-\d{2}-\d{2}/);
+  const nextMatch = tail.search(/\n(#{1,6} .*)?\d{4}-\d{2}-\d{2}[ \t\r]*(\n|$)/);
 
   if (nextMatch === -1) {
     return existing.trimEnd() + '\n' + newEntry + '\n';

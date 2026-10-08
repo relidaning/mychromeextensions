@@ -205,7 +205,9 @@
 
     for (const node of collectTextNodes(document.body)) {
       const marks = highlightNodeMatches(node, regex);
-      if (marks.length) matches.push(...marks);
+      // Not push(...marks): spreading a six-figure match count from one text
+      // node overflows the call stack.
+      for (const mark of marks) matches.push(mark);
     }
     currentIndex = matches.length ? 0 : -1;
     setCurrent(currentIndex);
