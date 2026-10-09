@@ -1,6 +1,11 @@
 (function () {
-  const HIGHLIGHT_CLASS = 'rgx-filter-hl';
-  const CURRENT_CLASS = 'rgx-filter-hl-current';
+  // Matches are painted with the CSS Custom Highlight API instead of being
+  // wrapped in <mark> elements, so the page's DOM is never touched. Splitting a
+  // text node detaches the node a framework (React, Vue, ...) still holds, and
+  // its later updates to that text are then lost for good, even after Esc; an
+  // HTML <mark> inside SVG <text> also makes the text disappear.
+  const HIGHLIGHT_NAME = 'rgx-filter-hl';
+  const CURRENT_NAME = 'rgx-filter-hl-current';
   const STYLE_ID = 'rgx-filter-style';
 
   let overlayEl = null;
@@ -8,7 +13,6 @@
   let counterEl = null;
   let matches = [];
   let currentIndex = -1;
-  let currentMark = null;
   let lastSearchedPattern = null;
 
   function injectStyle() {
@@ -16,14 +20,13 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      mark.${HIGHLIGHT_CLASS} {
-        background: #ffe066;
+      ::highlight(${HIGHLIGHT_NAME}) {
+        background-color: #ffe066;
         color: #1a1a1a;
-        border-radius: 2px;
-        padding: 0;
       }
-      mark.${CURRENT_CLASS} {
-        background: #ff9f1c;
+      ::highlight(${CURRENT_NAME}) {
+        background-color: #ff9f1c;
+        color: #1a1a1a;
       }
       #rgx-filter-overlay {
         position: fixed;
@@ -95,85 +98,71 @@
     return nodes;
   }
 
-  function highlightNodeMatches(textNode, regex) {
-    const text = textNode.nodeValue;
+  function findNodeMatches(textNode, regex) {
     regex.lastIndex = 0;
-    const found = [...text.matchAll(regex)];
-    if (found.length === 0) return [];
-
-    const frag = document.createDocumentFragment();
-    const marks = [];
-    let lastEnd = 0;
-    for (const m of found) {
+    // StaticRange, not Range: every live Range has to be fixed up on each DOM
+    // mutation the page makes, which gets slow with thousands of matches.
+    const ranges = [];
+    for (const m of textNode.nodeValue.matchAll(regex)) {
       if (m[0].length === 0) continue;
-      if (m.index > lastEnd) {
-        frag.appendChild(document.createTextNode(text.slice(lastEnd, m.index)));
-      }
-      const mark = document.createElement('mark');
-      mark.className = HIGHLIGHT_CLASS;
-      mark.textContent = m[0];
-      frag.appendChild(mark);
-      marks.push(mark);
-      lastEnd = m.index + m[0].length;
+      ranges.push(new StaticRange({
+        startContainer: textNode,
+        startOffset: m.index,
+        endContainer: textNode,
+        endOffset: m.index + m[0].length,
+      }));
     }
-    if (marks.length === 0) return [];
-    if (lastEnd < text.length) {
-      frag.appendChild(document.createTextNode(text.slice(lastEnd)));
-    }
-    textNode.parentNode.replaceChild(frag, textNode);
-    return marks;
+    return ranges;
   }
 
   function clearHighlights() {
-    // Rebuild each run of text + marks as one text node in a single DOM edit.
-    // Unwrapping mark by mark and calling parent.normalize() each time re-walked
-    // (and re-laid-out) the whole parent per match: seconds on a block with
-    // thousands of hits.
-    const parents = new Set();
-    document.querySelectorAll(`mark.${HIGHLIGHT_CLASS}`).forEach((mark) => {
-      if (mark.parentNode) parents.add(mark.parentNode);
-    });
-    const isMark = (n) => n.nodeType === Node.ELEMENT_NODE && n.nodeName === 'MARK' && n.classList.contains(HIGHLIGHT_CLASS);
-    // One Range for everything: every live Range has to be fixed up on each DOM
-    // mutation, so one per run would make this quadratic again.
-    const range = document.createRange();
-    for (const parent of parents) {
-      let node = parent.firstChild;
-      while (node) {
-        if (node.nodeType !== Node.TEXT_NODE && !isMark(node)) {
-          node = node.nextSibling;
-          continue;
-        }
-        const first = node;
-        let last = node;
-        let hasMark = false;
-        const parts = [];
-        while (node && (node.nodeType === Node.TEXT_NODE || isMark(node))) {
-          if (node.nodeType !== Node.TEXT_NODE) hasMark = true;
-          parts.push(node.textContent);
-          last = node;
-          node = node.nextSibling;
-        }
-        if (!hasMark) continue;
-        range.setStartBefore(first);
-        range.setEndAfter(last);
-        range.deleteContents();
-        range.insertNode(document.createTextNode(parts.join('')));
-      }
-    }
+    CSS.highlights.delete(HIGHLIGHT_NAME);
+    CSS.highlights.delete(CURRENT_NAME);
     matches = [];
     currentIndex = -1;
-    currentMark = null;
+  }
+
+  // What mark.scrollIntoView({ block: 'center', inline: 'nearest' }) did, for a
+  // range: centre it in every scrollable ancestor, innermost first, then in the
+  // viewport.
+  function scrollToMatch(match) {
+    const range = document.createRange();
+    try {
+      range.setStart(match.startContainer, match.startOffset);
+      range.setEnd(match.endContainer, match.endOffset);
+    } catch (e) {
+      return; // the page has shortened this text since the scan
+    }
+    if (range.getClientRects().length === 0) return; // hidden or removed
+    const scrollInto = (scroller, top, left, width, height) => {
+      const rect = range.getBoundingClientRect();
+      const dy = rect.top + rect.height / 2 - (top + height / 2);
+      let dx = 0;
+      if (rect.left < left) dx = rect.left - left;
+      else if (rect.right > left + width) dx = rect.right - (left + width);
+      // 'instant' so a page with scroll-behavior: smooth can't leave the next
+      // measurement mid-animation.
+      scroller.scrollBy({ top: dy, left: dx, behavior: 'instant' });
+    };
+    const root = document.documentElement;
+    for (let el = match.startContainer.parentElement; el && el !== root; el = el.parentElement) {
+      if (el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth) continue;
+      const box = el.getBoundingClientRect();
+      scrollInto(el, box.top + el.clientTop, box.left + el.clientLeft, el.clientWidth, el.clientHeight);
+    }
+    scrollInto(window, 0, 0, root.clientWidth, root.clientHeight);
   }
 
   function setCurrent(index) {
-    // Only one mark carries CURRENT_CLASS, so swap it instead of touching every match.
-    if (currentMark) currentMark.classList.remove(CURRENT_CLASS);
-    currentMark = matches[index] || null;
-    if (currentMark) {
-      currentMark.classList.add(CURRENT_CLASS);
-      currentMark.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const match = matches[index];
+    if (!match) {
+      CSS.highlights.delete(CURRENT_NAME);
+      return;
     }
+    const current = new Highlight(match);
+    current.priority = 1; // paint over the all-matches highlight
+    CSS.highlights.set(CURRENT_NAME, current);
+    scrollToMatch(match);
   }
 
   function updateCounter() {
@@ -203,12 +192,16 @@
     }
     setInputError(false);
 
+    // add() one by one, not new Highlight(...matches) or push(...ranges):
+    // spreading a six-figure match count overflows the call stack.
+    const highlight = new Highlight();
     for (const node of collectTextNodes(document.body)) {
-      const marks = highlightNodeMatches(node, regex);
-      // Not push(...marks): spreading a six-figure match count from one text
-      // node overflows the call stack.
-      for (const mark of marks) matches.push(mark);
+      for (const range of findNodeMatches(node, regex)) {
+        matches.push(range);
+        highlight.add(range);
+      }
     }
+    if (matches.length) CSS.highlights.set(HIGHLIGHT_NAME, highlight);
     currentIndex = matches.length ? 0 : -1;
     setCurrent(currentIndex);
     updateCounter();
