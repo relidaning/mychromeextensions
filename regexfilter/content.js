@@ -133,7 +133,13 @@
     } catch (e) {
       return; // the page has shortened this text since the scan
     }
-    if (range.getClientRects().length === 0) return; // hidden or removed
+    if (range.getClientRects().length === 0) {
+      // Off-screen text under content-visibility: auto can report no boxes
+      // until it is near the viewport; its element can still be scrolled to.
+      const el = match.startContainer.parentElement;
+      if (el) el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+      if (range.getClientRects().length === 0) return; // removed, or hidden since the scan
+    }
     const scrollInto = (scroller, top, left, width, height) => {
       const rect = range.getBoundingClientRect();
       const dy = rect.top + rect.height / 2 - (top + height / 2);
@@ -196,7 +202,13 @@
     // spreading a six-figure match count overflows the call stack.
     const highlight = new Highlight();
     for (const node of collectTextNodes(document.body)) {
-      for (const range of findNodeMatches(node, regex)) {
+      const ranges = findNodeMatches(node, regex);
+      // Text the page isn't rendering (display: none, visibility: hidden, a
+      // closed <details>) can't be painted or scrolled to: counting it makes
+      // Enter land on matches that show nothing. Checked only for nodes that
+      // match, since it costs more than the regex does.
+      if (!ranges.length || !node.parentElement.checkVisibility({ visibilityProperty: true })) continue;
+      for (const range of ranges) {
         matches.push(range);
         highlight.add(range);
       }
