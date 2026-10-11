@@ -98,6 +98,28 @@
     return nodes;
   }
 
+  // Whether text directly inside `el` is drawn. checkVisibility() is false for
+  // a display: contents element, which has no box of its own though its text
+  // is drawn, so that case is decided by the nearest ancestor that has a box.
+  function isRendered(el) {
+    if (el.checkVisibility({ visibilityProperty: true })) return true;
+    let style = getComputedStyle(el);
+    if (style.display !== 'contents' || style.visibility !== 'visible') return false;
+    let box = el;
+    let child;
+    do {
+      child = box;
+      box = box.parentElement;
+      if (!box) return false;
+      style = getComputedStyle(box);
+    } while (style.display === 'contents');
+    // checkVisibility() on the box covers what is above it, not what the box
+    // does to its own children: content-visibility: hidden, a closed <details>.
+    if (style.contentVisibility === 'hidden') return false;
+    if (box.nodeName === 'DETAILS' && !box.open && child !== box.querySelector(':scope > summary')) return false;
+    return box.checkVisibility();
+  }
+
   function findNodeMatches(textNode, regex) {
     regex.lastIndex = 0;
     // StaticRange, not Range: every live Range has to be fixed up on each DOM
@@ -207,7 +229,7 @@
       // closed <details>) can't be painted or scrolled to: counting it makes
       // Enter land on matches that show nothing. Checked only for nodes that
       // match, since it costs more than the regex does.
-      if (!ranges.length || !node.parentElement.checkVisibility({ visibilityProperty: true })) continue;
+      if (!ranges.length || !isRendered(node.parentElement)) continue;
       for (const range of ranges) {
         matches.push(range);
         highlight.add(range);
