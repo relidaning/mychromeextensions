@@ -316,6 +316,12 @@
   document.addEventListener(
     'keydown',
     (event) => {
+      // A site that swaps in a new <body> on navigation (Turbo, pjax) takes the
+      // box out of the page with it. Treat that as closed: otherwise Ctrl+Q does
+      // nothing until an Esc the page never sees, and the matches keep the whole
+      // old page in memory.
+      if (overlayEl && !overlayEl.isConnected) closeOverlay();
+
       if (overlayEl && event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
@@ -323,13 +329,19 @@
         return;
       }
 
-      if (!overlayEl && event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'q') {
+      if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'q') {
         const target = event.target;
         const tag = target && target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || (target && target.isContentEditable)) return;
         event.preventDefault();
         event.stopPropagation();
-        openOverlay();
+        if (overlayEl) {
+          // Already open, but focus has moved to the page: go back to the box.
+          inputEl.focus();
+          inputEl.select();
+        } else {
+          openOverlay();
+        }
       }
     },
     true
