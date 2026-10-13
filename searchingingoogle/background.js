@@ -111,8 +111,14 @@ function buildContent(existing, dateHeading, newEntry) {
   // that merely mentions it and file the new entry under the wrong day.
   const heading = existing.match(new RegExp(`^(#{1,6} .*)?${dateHeading}[ \\t\\r]*$`, 'm'));
   if (!heading) {
-    // No section for today yet — append at end
-    return existing.trimEnd() + '\n\n' + dateHeading + '\n\n' + newEntry + '\n';
+    // No section for today yet — append at end, written the way the file's
+    // last day line is: a file of "### 2026-10-05" headings gets a "### "
+    // heading, not a bare date that Obsidian shows as a paragraph and leaves
+    // out of the outline.
+    const dayLines = [...existing.matchAll(/^(?:(#{1,6}) .*)?\d{4}-\d{2}-\d{2}[ \t\r]*$/gm)];
+    const hashes = dayLines.length ? dayLines[dayLines.length - 1][1] : '';
+    const prefix = hashes ? hashes + ' ' : '';
+    return existing.trimEnd() + '\n\n' + prefix + dateHeading + '\n\n' + newEntry + '\n';
   }
 
   // Find where this date's section ends (next date heading or EOF)
