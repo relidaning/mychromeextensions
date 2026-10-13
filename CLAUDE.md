@@ -26,7 +26,7 @@ The `customizekeys` extension is a skeleton with only a manifest (no logic yet).
 | Directory | What it does |
 |---|---|
 | `hello` | Popup demo |
-| `autofocus` | Focuses the search input on Baidu / Google / ChatGPT / DeepSeek when the tab is activated or the window gains focus |
+| `autofocus` | Focuses the search input on Baidu / Google / DeepSeek when the tab is activated or the window gains focus |
 | `searchingingoogle` | `Ctrl+X` searches selected text (falls back to clipboard) on Google appending " meaning"; `Ctrl+Z` does the same appending " 中文" for Chinese explanation; `Ctrl+B` appends the selection to the monthly Obsidian diary via the Local REST API (GET then PUT — only a 404 on the GET means "new file"; any other failure must abort, or the PUT overwrites the whole month; saves are queued one behind another through `saveQueue`, because two overlapping GET-then-PUT saves would read the same file and the second PUT would drop the first entry; the GET and PUT each carry `AbortSignal.timeout(8000)` so one hung request can't stall the whole queue; today's section is located by its heading line — a bare date or a markdown heading ending in it, e.g. `### YYYY-MM-DD` — never by `indexOf(date)`, which matches dates mentioned inside entries) |
 | `rmmaskinrarbg` | Removes the `<ab-detector>` element injected by rarbg's anti-adblock overlay |
 | `customizekeys` | Stub for custom keyboard shortcuts |
