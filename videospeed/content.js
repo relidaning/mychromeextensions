@@ -17,11 +17,22 @@
     if (pool.length === 0) return null;
     const playing = pool.filter((v) => !v.paused && !v.ended);
     if (playing.length > 0) pool = playing;
-    return pool.reduce((largest, v) => {
-      const area = v.clientWidth * v.clientHeight;
-      const largestArea = largest.clientWidth * largest.clientHeight;
-      return area > largestArea ? v : largest;
-    }, pool[0]);
+    // Once the user pauses, nothing is "playing" any more. Stick with the video
+    // we last controlled so a resume doesn't land on some other (e.g. hidden feed)
+    // <video> that the site immediately pauses again.
+    else if (lastVideo && pool.includes(lastVideo)) return lastVideo;
+    return pool.reduce((best, v) => (visibleArea(v) > visibleArea(best) ? v : best), pool[0]);
+  }
+
+  let lastVideo = null;
+
+  // Area of the video actually inside the viewport, so off-screen / scrolled-away
+  // videos lose to the one the user is looking at.
+  function visibleArea(v) {
+    const r = v.getBoundingClientRect();
+    const w = Math.min(r.right, window.innerWidth) - Math.max(r.left, 0);
+    const h = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+    return w > 0 && h > 0 ? w * h : 0;
   }
 
   function showToast(video, text) {
@@ -69,6 +80,7 @@
   function applySeek(delta, video) {
     video = video || getActiveVideo();
     if (!video) return;
+    lastVideo = video;
     const duration = video.duration;
     let next = video.currentTime + delta;
     next = Math.max(0, Number.isFinite(duration) ? Math.min(duration, next) : next);
@@ -77,10 +89,16 @@
   }
 
   function togglePlay(video) {
+    lastVideo = video;
     const willPlay = video.paused;
     if (willPlay) video.play().catch(() => {});
     else video.pause();
     showToast(video, willPlay ? '▶' : '⏸');
+  }
+
+  function runAction(action, video) {
+    if (action === 'toggle') togglePlay(video);
+    else applySeek(action === 'forward' ? SEEK_STEP : -SEEK_STEP, video);
   }
 
   // Keys we've consumed on keydown and must also swallow on the matching keyup,
@@ -89,7 +107,10 @@
   // swallowing the keyup our action gets undone (Space) or stacked on (arrows).
   const consumedKeys = new Set();
 
-  document.addEventListener(
+  // Listen on window, not document: window's capture phase runs before
+  // document's, so we pre-empt site handlers that would otherwise toggle the
+  // video a second time (the "starts then pauses immediately" symptom).
+  window.addEventListener(
     'keydown',
     (event) => {
       const target = event.target;
@@ -125,19 +146,31 @@
       // that iframe, then owns the keydown). stopImmediatePropagation + the keyup
       // swallow below fully pre-empt players that already handle these keys
       // (YouTube, video.js, ...) so a press does exactly one thing.
+      const action = isPlayPauseKey ? 'toggle' : event.key === 'ArrowRight' ? 'forward' : 'back';
       const video = getActiveVideo();
-      if (!video) return;
+      if (!video) {
+        // Keyboard focus is often on the top frame while the real <video> sits in
+        // an iframe that was never clicked, so hand the key to the other frames.
+        // Only take the key away from the page if an iframe could plausibly own
+        // the video, otherwise Space / arrows keep scrolling normally.
+        if (!event.repeat && window === window.top && document.querySelector('iframe')) {
+          event.preventDefault();
+          chrome.runtime.sendMessage({ type: 'key-broadcast', action });
+        } else if (window !== window.top && !event.repeat) {
+          chrome.runtime.sendMessage({ type: 'key-broadcast', action });
+        }
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
       consumedKeys.add(event.key);
       if (event.repeat) return;
-      if (isSeekKey) applySeek(event.key === 'ArrowRight' ? SEEK_STEP : -SEEK_STEP, video);
-      else togglePlay(video);
+      runAction(action, video);
     },
     true
   );
 
-  document.addEventListener(
+  window.addEventListener(
     'keyup',
     (event) => {
       if (!consumedKeys.has(event.key)) return;
@@ -150,6 +183,10 @@
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'speed-apply') applyDelta(message.delta);
+    else if (message.type === 'key-apply') {
+      const video = getActiveVideo();
+      if (video) runAction(message.action, video);
+    }
   });
 
   // Douyin's player cancels every keydown while a video is open, whatever
@@ -178,6 +215,8 @@
     let savedMuted = false;
     let wallRemovedAt = 0;
     let reloadedForWall = false;
+    const AD_RATE = 16;
+    let skippedThisAd = false;
 
     // The "ad blocker detected" wall is a separate ytd-enforcement-message-view-model
     // dialog (not a skippable ad) that YouTube injects and uses to pause the player.
@@ -225,21 +264,35 @@
       if (adShowing) {
         if (!adWasShowing) savedMuted = video.muted;
         video.muted = true;
-        // Seeking the ad to its end is what actually dismisses it. It needs no
-        // trusted click (so no chrome.debugger, and no "started debugging this
-        // browser" infobar reflowing the page out from under us), and it works
-        // on non-skippable ads too, which a Skip button click never could.
-        if (Number.isFinite(video.duration) && video.duration > 0) {
-          if (video.currentTime < video.duration - 0.15) video.currentTime = video.duration;
-          if (video.paused) video.play().catch(() => {});
+        // Fast-forward the ad instead of seeking to its end. A seek to the end makes
+        // the ad look skipped/tampered with, and YouTube answers by serving ads far
+        // more often (about every minute). Playing it through at 16x is the
+        // closest thing to a normal view that still takes only a second or two,
+        // needs no trusted click (no chrome.debugger infobar), and also works on
+        // unskippable ads.
+        if (video.playbackRate !== AD_RATE) video.playbackRate = AD_RATE;
+        if (video.paused) video.play().catch(() => {});
+        // A skippable ad whose Skip button is up: do what a person pressing it does.
+        // (Synthetic clicks are often ignored, so also jump to the end, but only
+        // once the button is offered, which looks like a normal skip, not tampering.)
+        const skip = player.querySelector(
+          '.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern'
+        );
+        if (skip && skip.offsetParent !== null && !skippedThisAd) {
+          skippedThisAd = true;
+          skip.click();
+          if (Number.isFinite(video.duration) && video.duration > 0) {
+            video.currentTime = video.duration;
+          }
         }
       } else if (adWasShowing) {
+        skippedThisAd = false;
         video.muted = savedMuted;
         // The ad and the feature share one <video>, and YouTube resets its rate
         // when it swaps the source back, so re-apply what the user asked for.
         video.playbackRate = userDesiredRate;
       }
       adWasShowing = adShowing;
-    }, 300);
+    }, 150);
   }
 })();

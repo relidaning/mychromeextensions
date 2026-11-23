@@ -1,0 +1,5 @@
+# Sessions
+
+## 2026-09-11 — Create Find My proximity alert script
+
+Built `findmy-proximity/`, a standalone Python watcher (not a Chrome extension — it just lives in this repo) that polls iCloud via `pyicloud` for a friend's shared Find My location plus your own device location, computes the haversine distance, and fires a macOS / ntfy / print notification when the friend comes within `threshold_meters`. Hysteresis (`hysteresis_meters`) prevents boundary chatter; an optional `approach_drop_meters` early warning fires when the friend closes a set distance while still outside the threshold. Non-obvious decisions: `pyicloud` import is made soft (`PyiCloudService = None`) so `--help` works without the dep; Apple timestamps are normalised from ms to seconds; auth needs the real Apple ID password + interactive 2FA (app-specific passwords do not cover the Find My endpoints), with the session cached in `~/.pyicloud/`. Not committed yet — pending the user confirming `--list` works against their live Apple account (the `api.friends` service is retired on some accounts; `icloudpy` is the documented fallback).

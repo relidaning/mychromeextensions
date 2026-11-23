@@ -1,0 +1,13 @@
+{
+  "apple_id": "",
+  "friend": "",
+  "my_location": { "mode": "device", "device_name": "", "lat": null, "lon": null },
+  "threshold_meters": 1000,
+  "hysteresis_meters": 500,
+  "approach_drop_meters": 0,
+  "approach_window": 5,
+  "poll_seconds": 120,
+  "stale_after_seconds": 1800,
+  "notifier": "macos",
+  "ntfy_topic": ""
+}
