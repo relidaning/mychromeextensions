@@ -13,7 +13,7 @@ chrome.commands.onCommand.addListener(function (command) {
       try {
         const results = await chrome.scripting.executeScript({
           target: { tabId: tabs[0].id },
-          func: () => window.getSelection().toString()
+          func: readSelectedText
         });
         const text = results[0]?.result?.trim();
         if (!text) return;
@@ -36,13 +36,21 @@ chrome.commands.onCommand.addListener(function (command) {
   };
   const suffix = suffixMap[command];
   if (suffix) {
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
       if (!tabs[0]) return;
-      chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id },
-        func: searchWithSuffix,
-        args: [suffix]
-      }).catch(() => {});
+      try {
+        const [result] = await chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id },
+          func: readSelectedText,
+          args: [true]
+        });
+        const text = result?.result;
+        if (text) {
+          await chrome.tabs.create({
+            url: 'https://www.google.com/search?q=' + encodeURIComponent(text + suffix)
+          });
+        }
+      } catch (e) {}
     });
   }
 });
@@ -153,18 +161,14 @@ function showToast(message) {
   setTimeout(() => el.remove(), 2300);
 }
 
-function searchWithSuffix(suffix) {
-  let selectedText = window.getSelection().toString();
-  const searchURL = `https://www.google.com/search?q=`;
-  if (selectedText) {
-    window.open(searchURL + encodeURIComponent(selectedText + suffix), "_blank");
-  } else {
-    navigator.clipboard.readText()
-      .then(text => {
-        window.open(searchURL + encodeURIComponent(text + suffix), "_blank");
-      })
-      .catch(err => {
-        console.error("无法访问剪贴板:", err);
-      });
+function readSelectedText(useClipboard = false) {
+  let focusedDocument = document;
+  // EPUB chapters live in same-origin frames. Follow focus so a selection
+  // left behind in a different chapter or frame doesn't win.
+  while (focusedDocument.activeElement?.contentDocument) {
+    focusedDocument = focusedDocument.activeElement.contentDocument;
   }
+  const text = focusedDocument.getSelection()?.toString().trim();
+  if (text) return text;
+  return useClipboard ? navigator.clipboard.readText() : '';
 }
